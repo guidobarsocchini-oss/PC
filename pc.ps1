@@ -61,12 +61,24 @@ $AppDaRimuovere = @(
     '7EE7776C.LinkedInforWindows'
     '*SpotifyMusic*', '*Disney*', '*TikTok*', '*Instagram*', '*Facebook*'
     '*CandyCrush*', '*king.com*', '*Netflix*', '*PrimeVideo*'
+    '*McAfee*', '*Norton*', '*HPWolf*', '*HPSureShield*'     # parte "Store" degli antivirus di prova
     # 'Microsoft.GamingApp', 'Microsoft.XboxGamingOverlay'   # Xbox / Game Bar
 )
 
 # Office Click-to-Run preinstallato dall'OEM (tutte le lingue): regex sul nome
 # ATTENZIONE: rimuove anche un Office installato da te. Disattiva il passo se serve.
 $OfficeDaRimuovere = '^(Microsoft 365|Microsoft Office|Office 16|Microsoft OneNote)'
+
+# Antivirus di prova e sicurezza OEM da disinstallare: regex sul nome, nell'ordine indicato.
+# ATTENZIONE: non metterci l'antivirus che installi tu, o rilanciando lo script lo toglie.
+$AntivirusDaRimuovere = @(
+    '^McAfee', '^WebAdvisor'
+    '^Norton'
+    '^Avast', '^AVG '
+    '^HP Wolf Security'              # prima "HP Wolf Security", poi "HP Wolf Security - Console"
+    '^HP Sure (Click|Sense)'
+    '^HP Security Update Service'    # per ultimo
+)
 
 # ================================================================ FUNZIONI
 $RadiciUtente = @('Registry::HKEY_CURRENT_USER')
@@ -208,6 +220,43 @@ Passo 'Disinstallazione OneDrive' {
     }
     # togli OneDrive dal riquadro di spostamento di Esplora file
     Set-UserReg 'Software\Classes\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}' 'System.IsPinnedToNameSpaceTree' 0
+}
+
+Passo 'Disinstallazione antivirus di prova e HP Wolf Security' {
+    $trovato = $false
+    foreach ($pat in $AntivirusDaRimuovere) {
+        # rileggo ogni volta: una disinstallazione puo' portarsi via altre voci
+        foreach ($v in (Get-VociDisinstallazione | Where-Object { $_.DisplayName -match $pat } | Sort-Object DisplayName -Unique)) {
+            $trovato = $true
+            Write-Host "  - $($v.DisplayName)"
+            $guid = $null
+            if ("$($v.UninstallString)" -match 'msiexec' -and "$($v.UninstallString)" -match '\{[0-9A-Fa-f-]{36}\}') { $guid = $Matches[0] }
+            elseif ($v.WindowsInstaller -eq 1 -and $v.PSChildName -match '^\{[0-9A-Fa-f-]{36}\}$') { $guid = $v.PSChildName }
+
+            if ($v.QuietUninstallString) {
+                $exe, $arg = Split-Comando $v.QuietUninstallString
+                $rc = Start-Exe $exe $arg
+            } elseif ($guid) {
+                $rc = Start-Exe "$env:SystemRoot\System32\msiexec.exe" "/x $guid /qn /norestart"
+            } else {
+                # nessuna modalita' silenziosa nota: apro il programma di rimozione e aspetto
+                Write-Host '    >> richiede conferma a mano: completa la finestra che si apre' -ForegroundColor Yellow
+                $exe, $arg = Split-Comando $v.UninstallString
+                if ($arg) { $p = Start-Process -FilePath $exe -ArgumentList $arg -Wait -PassThru }
+                else      { $p = Start-Process -FilePath $exe -Wait -PassThru }
+                $rc = $p.ExitCode
+            }
+            switch ($rc) {
+                0       { }
+                3010    { Write-Host '    rimosso, serve un riavvio' }
+                1641    { Write-Host '    rimosso, serve un riavvio' }
+                1605    { Write-Host '    gia'' rimosso' }
+                default { Write-Warning "    codice di uscita $rc (se e' HP Wolf: riavvia e rilancia lo script)" }
+            }
+        }
+    }
+    if (-not $trovato) { Write-Host '  nessun antivirus di prova trovato' }
+    else { Write-Host '  Riavvia il PC prima di installare il tuo antivirus.' -ForegroundColor Yellow }
 }
 
 Passo 'Profilo energetico "CSistemi"' {
