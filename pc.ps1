@@ -275,11 +275,23 @@ Passo 'Tema predefinito di Windows' {
     Start-Sleep -Seconds 4
     Get-Process SystemSettings -ErrorAction SilentlyContinue | Stop-Process -Force
 
+    $scuro  = ($TemaWindows -eq 'dark.theme')
+    $chiaro = [int](-not $scuro)
+    $sfondo = "$env:SystemRoot\Web\Wallpaper\Windows\" + $(if ($scuro) { 'img19.jpg' } else { 'img0.jpg' })
+
+    # Utente corrente: imposto comunque lo sfondo standard di Windows, anche se il tema non lo ha cambiato
+    if (Test-Path $sfondo) {
+        Set-Reg 'Registry::HKEY_CURRENT_USER\Control Panel\Desktop' 'WallpaperStyle' '10' 'String'   # 10 = riempi
+        Set-Reg 'Registry::HKEY_CURRENT_USER\Control Panel\Desktop' 'TileWallpaper' '0' 'String'
+        if (-not ('PreparaPC.Sfondo' -as [type])) {
+            Add-Type -Namespace PreparaPC -Name Sfondo -MemberDefinition '[DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] public static extern bool SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);'
+        }
+        # 20 = SPI_SETDESKWALLPAPER, 3 = salva nel profilo e avvisa le applicazioni
+        if (-not [PreparaPC.Sfondo]::SystemParametersInfo(20, 0, $sfondo, 3)) { Write-Warning '  sfondo non applicato' }
+    } else { Write-Warning "  sfondo non trovato: $sfondo" }
+
     # Nuovi utenti: sfondo e modalita' chiaro/scuro di Windows nel profilo Default
     if ($HiveDefault) {
-        $scuro  = ($TemaWindows -eq 'dark.theme')
-        $chiaro = [int](-not $scuro)
-        $sfondo = "$env:SystemRoot\Web\Wallpaper\Windows\" + $(if ($scuro) { 'img19.jpg' } else { 'img0.jpg' })
         $d = 'Registry::HKEY_USERS\PrepDefault'
         Set-Reg "$d\Software\Microsoft\Windows\CurrentVersion\Themes" 'CurrentTheme' $tema 'String'
         Set-Reg "$d\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" 'AppsUseLightTheme' $chiaro
