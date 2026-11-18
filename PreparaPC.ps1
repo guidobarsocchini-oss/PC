@@ -12,7 +12,7 @@
     Log: C:\ProgramData\PreparaPC\
 #>
 
-$PreparaPCUrl  = 'https://raw.githubusercontent.com/guidobarsocchini-oss/PC/refs/heads/main/PreparaPC.ps1'   # <-- da cambiare
+$PreparaPCUrl  = 'https://raw.githubusercontent.com/guidobarsocchini-oss/PC/main/PreparaPC.ps1'
 $PreparaPCFile = $PSCommandPath
 
 & {
@@ -208,6 +208,38 @@ Passo 'Disinstallazione OneDrive' {
     }
     # togli OneDrive dal riquadro di spostamento di Esplora file
     Set-UserReg 'Software\Classes\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}' 'System.IsPinnedToNameSpaceTree' 0
+}
+
+Passo 'Profilo energetico "CSistemi"' {
+    $guid = 'a1c5157e-2026-4c51-8e11-707265706172'    # GUID fisso: rilanciando lo script non crea doppioni
+    $pc   = "$env:SystemRoot\System32\powercfg.exe"
+    if (-not ((& $pc /list | Out-String) -match $guid)) {
+        if ((Start-Exe $pc "/duplicatescheme SCHEME_BALANCED $guid") -ne 0) { throw 'impossibile creare il profilo' }
+    }
+    [void](Start-Exe $pc "/changename $guid `"CSistemi`" `"Profilo standard PC consegnati`"")
+    if ((Start-Exe $pc "/setactive $guid") -ne 0) { throw 'impossibile attivare il profilo' }
+
+    # minuti, 0 = mai   (ac = a corrente, dc = a batteria)
+    $tempi = [ordered]@{
+        'monitor-timeout-ac'   = 0     # schermo a corrente: mai
+        'monitor-timeout-dc'   = 30    # schermo a batteria: 30 minuti
+        'standby-timeout-ac'   = 0     # sospensione: mai
+        'standby-timeout-dc'   = 0
+        'hibernate-timeout-ac' = 0     # ibernazione: mai
+        'hibernate-timeout-dc' = 0
+        'disk-timeout-ac'      = 0     # disco: mai disattivato
+        'disk-timeout-dc'      = 0
+    }
+    foreach ($t in $tempi.GetEnumerator()) {
+        if ((Start-Exe $pc "/change $($t.Key) $($t.Value)") -ne 0) { Write-Warning "  $($t.Key) non applicato" }
+    }
+
+    # Sospensione selettiva USB: disattivata (0) a corrente e a batteria
+    $usb = '2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226'
+    foreach ($modo in '/setacvalueindex', '/setdcvalueindex') {
+        if ((Start-Exe $pc "$modo $guid $usb 0") -ne 0) { Write-Warning "  sospensione selettiva USB ($modo) non applicata" }
+    }
+    [void](Start-Exe $pc "/setactive $guid")    # riapplica il profilo con i nuovi valori
 }
 
 # ---- esempi pronti, disattivati: metti $true per usarli ----
