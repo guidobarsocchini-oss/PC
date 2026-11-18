@@ -151,7 +151,7 @@ Passo 'Nascondi Visualizzazione attivita, Widget, Copilot, Chat' {
     Set-UserReg $KeyAdvanced 'ShowTaskViewButton' 0
     Set-UserReg $KeyAdvanced 'ShowCopilotButton' 0
     Set-UserReg $KeyAdvanced 'TaskbarMn' 0
-    Set-UserReg $KeyAdvanced 'TaskbarDa' 0    # sulle build recenti puo' dare "accesso negato": c'e' la policy sotto
+    # Widget: la chiave utente TaskbarDa e' protetta da Windows (accesso negato), si usa la policy di sistema
     Set-Reg 'HKLM:\SOFTWARE\Policies\Microsoft\Dsh' 'AllowNewsAndInterests' 0
 }
 
@@ -260,6 +260,18 @@ Passo 'Disinstallazione antivirus di prova e HP Wolf Security' {
     }
     if (-not $trovato) { Write-Host '  nessun antivirus di prova trovato' }
     else { Write-Host '  Riavvia il PC prima di installare il tuo antivirus.' -ForegroundColor Yellow }
+}
+
+Passo 'Controllo intelligente delle app: disattivato' {
+    # 0 = disattivato, 1 = attivato, 2 = valutazione
+    $ci = 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy'
+    $prima = (Get-ItemProperty -Path $ci -Name 'VerifiedAndReputablePolicyState' -ErrorAction SilentlyContinue).VerifiedAndReputablePolicyState
+    Set-Reg $ci 'VerifiedAndReputablePolicyState' 0
+    $citool = "$env:SystemRoot\System32\CiTool.exe"
+    if (Test-Path $citool) { [void](Start-Exe $citool '-r') }    # ricarica i criteri senza aspettare il riavvio
+    $dopo = (Get-ItemProperty -Path $ci -Name 'VerifiedAndReputablePolicyState').VerifiedAndReputablePolicyState
+    if ($dopo -ne 0) { throw "valore rimasto a ${dopo}: Windows ha rifiutato la modifica" }
+    Write-Host "  stato: $prima -> 0 (effettivo dopo il riavvio)"
 }
 
 Passo 'Tema predefinito di Windows' {
