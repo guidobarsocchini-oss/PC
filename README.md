@@ -1,0 +1,2 @@
+# PC
+Script Preparazione pc
