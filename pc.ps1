@@ -259,13 +259,13 @@ Passo 'Disinstallazione antivirus di prova e HP Wolf Security' {
     else { Write-Host '  Riavvia il PC prima di installare il tuo antivirus.' -ForegroundColor Yellow }
 }
 
-Passo 'Profilo energetico "CSistemi"' {
+Passo 'Profilo energetico "HiPerf"' {
     $guid = 'a1c5157e-2026-4c51-8e11-707265706172'    # GUID fisso: rilanciando lo script non crea doppioni
     $pc   = "$env:SystemRoot\System32\powercfg.exe"
     if (-not ((& $pc /list | Out-String) -match $guid)) {
         if ((Start-Exe $pc "/duplicatescheme SCHEME_BALANCED $guid") -ne 0) { throw 'impossibile creare il profilo' }
     }
-    [void](Start-Exe $pc "/changename $guid `"CSistemi`" `"Profilo standard PC consegnati`"")
+    [void](Start-Exe $pc "/changename $guid `"HiPerf`" `"Profilo standard PC consegnati`"")
     if ((Start-Exe $pc "/setactive $guid") -ne 0) { throw 'impossibile attivare il profilo' }
 
     # minuti, 0 = mai   (ac = a corrente, dc = a batteria)
