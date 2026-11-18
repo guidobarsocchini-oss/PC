@@ -12,7 +12,7 @@
     Log: C:\ProgramData\PreparaPC\
 #>
 
-$PreparaPCUrl  = 'https://raw.githubusercontent.com/UTENTE/preparapc/main/PreparaPC.ps1'   # <-- da cambiare
+$PreparaPCUrl  = 'https://raw.githubusercontent.com/guidobarsocchini-oss/PC/refs/heads/main/PreparaPC.ps1'   # <-- da cambiare
 $PreparaPCFile = $PSCommandPath
 
 & {
