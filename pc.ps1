@@ -80,6 +80,9 @@ $AntivirusDaRimuovere = @(
     '^HP Security Update Service'    # per ultimo
 )
 
+# Tema da applicare: 'aero.theme' = Windows (chiaro), 'dark.theme' = Windows (scuro)
+$TemaWindows = 'aero.theme'
+
 # ================================================================ FUNZIONI
 $RadiciUtente = @('Registry::HKEY_CURRENT_USER')
 $HiveDefault  = $false
@@ -257,6 +260,32 @@ Passo 'Disinstallazione antivirus di prova e HP Wolf Security' {
     }
     if (-not $trovato) { Write-Host '  nessun antivirus di prova trovato' }
     else { Write-Host '  Riavvia il PC prima di installare il tuo antivirus.' -ForegroundColor Yellow }
+}
+
+Passo 'Tema predefinito di Windows' {
+    $tema = "$env:SystemRoot\Resources\Themes\$TemaWindows"
+    if (-not (Test-Path $tema)) { throw "tema non trovato: $tema" }
+
+    # Utente corrente: aprire il file .theme lo applica (e apre Impostazioni, che poi chiudo)
+    Start-Process -FilePath $tema
+    foreach ($i in 1..20) {
+        if (Get-Process SystemSettings -ErrorAction SilentlyContinue) { break }
+        Start-Sleep -Milliseconds 500
+    }
+    Start-Sleep -Seconds 4
+    Get-Process SystemSettings -ErrorAction SilentlyContinue | Stop-Process -Force
+
+    # Nuovi utenti: sfondo e modalita' chiaro/scuro di Windows nel profilo Default
+    if ($HiveDefault) {
+        $scuro  = ($TemaWindows -eq 'dark.theme')
+        $chiaro = [int](-not $scuro)
+        $sfondo = "$env:SystemRoot\Web\Wallpaper\Windows\" + $(if ($scuro) { 'img19.jpg' } else { 'img0.jpg' })
+        $d = 'Registry::HKEY_USERS\PrepDefault'
+        Set-Reg "$d\Software\Microsoft\Windows\CurrentVersion\Themes" 'CurrentTheme' $tema 'String'
+        Set-Reg "$d\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" 'AppsUseLightTheme' $chiaro
+        Set-Reg "$d\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" 'SystemUsesLightTheme' $chiaro
+        if (Test-Path $sfondo) { Set-Reg "$d\Control Panel\Desktop" 'Wallpaper' $sfondo 'String' }
+    }
 }
 
 Passo 'Profilo energetico "HiPerf"' {
